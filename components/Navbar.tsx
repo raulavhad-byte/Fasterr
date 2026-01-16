@@ -161,8 +161,9 @@ const Navbar: React.FC<NavbarProps> = ({ user, setUser, onSearch, selectedLocati
             <div className="flex justify-between items-center h-16 gap-4">
               
               {/* Logo */}
-              <Link to="/" className="flex-shrink-0 flex items-center">
-                <span className="text-3xl font-black text-brand-800 tracking-tighter">FASTERR</span>
+              <Link to="/" className="flex-shrink-0 flex flex-col items-start justify-center group">
+                <span className="text-3xl font-black text-brand-800 tracking-tighter leading-none group-hover:text-brand-700 transition-colors">FASTERR</span>
+                <span className="text-[10px] font-bold text-brand-600 tracking-widest uppercase -mt-1">Buy & Sell it. Easily.</span>
               </Link>
 
               {/* Location Selector */}

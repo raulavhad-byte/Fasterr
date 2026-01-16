@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getProductById, isProductFavorite, toggleFavorite, getSellerStats, getReviews, addReview, getChatMessages, sendChatMessage } from '../services/storageService';
 import { Product, User, Review, ChatMessage } from '../types';
-import { MapPin, Calendar, Share2, MessageCircle, Phone, ArrowLeft, ShieldCheck, Heart, ChevronLeft, ChevronRight, Star, Send, X, Paperclip, ImageIcon } from 'lucide-react';
+import { MapPin, Calendar, Share2, MessageCircle, Phone, ArrowLeft, ShieldCheck, Heart, ChevronLeft, ChevronRight, Star, Send, X, Paperclip, ImageIcon, Bell } from 'lucide-react';
 
 interface ProductDetailProps {
     user: User | null;
@@ -17,15 +17,31 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ user }) => {
   const [images, setImages] = useState<string[]>([]);
   const [sellerStats, setSellerStats] = useState<{totalListings: number, averageRating: string, reviewCount: number} | null>(null);
   const [sellerReviews, setSellerReviews] = useState<Review[]>([]);
+  
+  // Chat State
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotification, setShowNotification] = useState(false);
+
+  // Review State
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const showChatRef = useRef(showChat);
+
+  // Keep ref in sync with state for async operations
+  useEffect(() => {
+    showChatRef.current = showChat;
+    if (showChat) {
+        setUnreadCount(0);
+        setShowNotification(false);
+    }
+  }, [showChat]);
 
   useEffect(() => {
     if (id) {
@@ -77,9 +93,37 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ user }) => {
   const nextImage = () => setCurrentImageIndex((prev) => (prev + 1) % images.length);
   const prevImage = () => setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
 
+  const simulateSellerReply = () => {
+    setTimeout(() => {
+        if (!product) return;
+        
+        const replyText = "Thanks for your interest! Yes, the item is still available. Would you like to come see it?";
+        const replyMsg: ChatMessage = {
+            id: Date.now().toString(),
+            productId: product.id,
+            senderId: product.sellerId, // Simulated seller ID
+            text: replyText,
+            createdAt: Date.now()
+        };
+        
+        sendChatMessage(replyMsg);
+        setChatMessages(prev => [...prev, replyMsg]);
+
+        // If chat is closed, trigger notification
+        if (!showChatRef.current) {
+            setUnreadCount(prev => prev + 1);
+            setShowNotification(true);
+            
+            // Auto-hide notification after 4 seconds
+            setTimeout(() => setShowNotification(false), 4000);
+        }
+    }, 2500);
+  };
+
   const handleSendMessage = (e: React.FormEvent) => {
       e.preventDefault();
       if (!newMessage.trim() || !user) return;
+      
       const msg: ChatMessage = {
           id: Date.now().toString(),
           productId: product.id,
@@ -87,9 +131,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ user }) => {
           text: newMessage,
           createdAt: Date.now()
       };
+      
       sendChatMessage(msg);
       setChatMessages([...chatMessages, msg]);
       setNewMessage('');
+      
+      // Trigger simulation
+      simulateSellerReply();
   };
 
   const handleAttachmentClick = () => {
@@ -111,6 +159,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ user }) => {
         };
         sendChatMessage(msg);
         setChatMessages(prev => [...prev, msg]);
+        simulateSellerReply();
       };
       reader.readAsDataURL(file);
     }
@@ -133,6 +182,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ user }) => {
              };
              sendChatMessage(msg);
              setChatMessages(prev => [...prev, msg]);
+             simulateSellerReply();
          }, (err) => {
              alert("Could not access location");
          });
@@ -166,6 +216,28 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ user }) => {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Search
         </Link>
+
+        {/* Notification Toast */}
+        {showNotification && (
+            <div className="fixed bottom-24 right-4 md:bottom-10 md:right-8 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-2xl z-[70] flex items-center gap-3 animate-bounce-in">
+                <div className="relative">
+                    <div className="bg-brand-500 rounded-full p-2">
+                        <MessageCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                </div>
+                <div className="cursor-pointer" onClick={() => { setShowChat(true); setShowNotification(false); }}>
+                    <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">{product.sellerName}</p>
+                    <p className="text-sm font-medium">New message received</p>
+                </div>
+                <button onClick={() => setShowNotification(false)} className="text-gray-400 hover:text-white ml-2">
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column: Images & Info */}
@@ -303,10 +375,15 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ user }) => {
                                 if (!user) { navigate('/login'); return; }
                                 setShowChat(!showChat);
                             }}
-                            className="flex items-center justify-center gap-2 bg-brand-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
+                            className="relative flex items-center justify-center gap-2 bg-brand-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
                         >
                             <MessageCircle className="w-4 h-4" />
                             Chat
+                            {unreadCount > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm font-bold animate-pulse">
+                                    {unreadCount}
+                                </span>
+                            )}
                         </button>
                          <button 
                             onClick={() => alert("Phone number hidden for privacy in demo.")}
@@ -352,10 +429,15 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ user }) => {
                     if (!user) { navigate('/login'); return; }
                     setShowChat(!showChat);
                 }}
-                className="flex-1 flex items-center justify-center gap-2 bg-brand-600 text-white py-3 rounded-lg font-bold shadow-lg"
+                className="relative flex-1 flex items-center justify-center gap-2 bg-brand-600 text-white py-3 rounded-lg font-bold shadow-lg"
             >
                 <MessageCircle className="w-5 h-5" />
                 Chat
+                {unreadCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm font-bold animate-pulse">
+                        {unreadCount}
+                    </span>
+                )}
             </button>
             <button 
                 onClick={() => alert("Phone number hidden for privacy in demo.")}
