@@ -14,14 +14,20 @@ type SortOption = 'date_desc' | 'date_asc' | 'price_asc' | 'price_desc';
 
 const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }) => {
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   
-  // Filters
-  const [minPrice, setMinPrice] = useState<string>('');
-  const [maxPrice, setMaxPrice] = useState<string>('');
-  const [selectedCondition, setSelectedCondition] = useState<Condition | 'All'>('All');
-  const [sortOption, setSortOption] = useState<SortOption>('date_desc');
+  // Real active state
+  const [activeFilters, setActiveFilters] = useState({
+      category: 'All' as Category | 'All',
+      minPrice: '',
+      maxPrice: '',
+      condition: 'All' as Condition | 'All',
+      sortOption: 'date_desc' as SortOption
+  });
+
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  
+  // Temporary state for mobile menu
+  const [tempFilters, setTempFilters] = useState(activeFilters);
 
   useEffect(() => {
     const allProducts = getProducts();
@@ -30,34 +36,47 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
 
   useEffect(() => {
     if (smartFilters) {
-        if (smartFilters.category) setSelectedCategory(smartFilters.category as Category);
-        if (smartFilters.minPrice) setMinPrice(smartFilters.minPrice.toString());
-        if (smartFilters.maxPrice) setMaxPrice(smartFilters.maxPrice.toString());
-        if (smartFilters.sortBy) setSortOption(smartFilters.sortBy);
+        setActiveFilters(prev => ({
+            ...prev,
+            category: smartFilters.category || prev.category,
+            minPrice: smartFilters.minPrice ? smartFilters.minPrice.toString() : prev.minPrice,
+            maxPrice: smartFilters.maxPrice ? smartFilters.maxPrice.toString() : prev.maxPrice,
+            sortOption: smartFilters.sortBy || prev.sortOption
+        }));
     }
   }, [smartFilters]);
+
+  // Sync temp filters when opening mobile menu
+  useEffect(() => {
+    if (showMobileFilters) {
+        setTempFilters(activeFilters);
+    }
+  }, [showMobileFilters, activeFilters]);
 
   const categories = ['All', ...Object.values(Category)];
   const conditions = ['All', 'New', 'Like New', 'Good', 'Fair', 'Poor'];
 
   const filteredProducts = products.filter(product => {
+    // Do not show sold items in recommendations
+    if (product.status === 'sold') return false;
+
     const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           product.category.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
+    const matchesCategory = activeFilters.category === 'All' || product.category === activeFilters.category;
 
     const price = product.price;
-    const min = minPrice ? parseFloat(minPrice) : 0;
-    const max = maxPrice ? parseFloat(maxPrice) : Infinity;
+    const min = activeFilters.minPrice ? parseFloat(activeFilters.minPrice) : 0;
+    const max = activeFilters.maxPrice ? parseFloat(activeFilters.maxPrice) : Infinity;
     const matchesPrice = price >= min && price <= max;
 
-    const matchesCondition = selectedCondition === 'All' || product.condition === selectedCondition;
+    const matchesCondition = activeFilters.condition === 'All' || product.condition === activeFilters.condition;
     const matchesLocation = !locationFilter || product.location.toLowerCase().includes(locationFilter.toLowerCase());
 
     return matchesSearch && matchesCategory && matchesPrice && matchesCondition && matchesLocation;
   }).sort((a, b) => {
-      switch (sortOption) {
+      switch (activeFilters.sortOption) {
           case 'price_asc':
               return a.price - b.price;
           case 'price_desc':
@@ -71,28 +90,44 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
   });
 
   const clearFilters = () => {
-    setMinPrice('');
-    setMaxPrice('');
-    setSelectedCondition('All');
-    setSortOption('date_desc');
-    setSelectedCategory('All');
+    const reset = {
+        category: 'All' as Category | 'All',
+        minPrice: '',
+        maxPrice: '',
+        condition: 'All' as Condition | 'All',
+        sortOption: 'date_desc' as SortOption
+    };
+    setActiveFilters(reset);
+    setTempFilters(reset); // Also reset temp if open
   };
 
-  const hasActiveFilters = minPrice || maxPrice || selectedCondition !== 'All' || selectedCategory !== 'All';
+  const applyMobileFilters = () => {
+      setActiveFilters(tempFilters);
+      setShowMobileFilters(false);
+  };
 
-  const FilterPanel = () => (
+  const hasActiveFilters = activeFilters.minPrice || activeFilters.maxPrice || activeFilters.condition !== 'All' || activeFilters.category !== 'All';
+
+  // Reusable Filter Panel Component
+  const FilterPanel = ({ values, onChange, isMobile }: { values: typeof activeFilters, onChange: (newValues: typeof activeFilters) => void, isMobile?: boolean }) => {
+      
+      const update = (key: keyof typeof activeFilters, value: any) => {
+          onChange({ ...values, [key]: value });
+      };
+
+      return (
       <div className="space-y-6">
         <div>
             <h3 className="font-bold text-gray-900 mb-3 flex items-center justify-between">
                 Categories
-                {selectedCategory !== 'All' && <button onClick={() => setSelectedCategory('All')} className="text-xs text-brand-600">Reset</button>}
+                {values.category !== 'All' && <button onClick={() => update('category', 'All')} className="text-xs text-brand-600">Reset</button>}
             </h3>
             <ul className="space-y-1 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                 {categories.map(cat => (
                     <li key={cat}>
                         <button 
-                            onClick={() => setSelectedCategory(cat as Category | 'All')}
-                            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${selectedCategory === cat ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}
+                            onClick={() => update('category', cat)}
+                            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${values.category === cat ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                             {cat}
                         </button>
@@ -108,16 +143,16 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
                     type="number" 
                     placeholder="Min ₹" 
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-brand-500 focus:border-brand-500 bg-gray-50"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
+                    value={values.minPrice}
+                    onChange={(e) => update('minPrice', e.target.value)}
                 />
                 <span className="text-gray-400">-</span>
                 <input 
                     type="number" 
                     placeholder="Max ₹" 
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-brand-500 focus:border-brand-500 bg-gray-50"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
+                    value={values.maxPrice}
+                    onChange={(e) => update('maxPrice', e.target.value)}
                 />
             </div>
         </div>
@@ -129,9 +164,9 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
                      <label key={c} className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                          <input 
                             type="radio" 
-                            name="condition"
-                            checked={selectedCondition === c}
-                            onChange={() => setSelectedCondition(c as Condition)}
+                            name={`condition_${isMobile ? 'mobile' : 'desktop'}`}
+                            checked={values.condition === c}
+                            onChange={() => update('condition', c)}
                             className="text-brand-600 focus:ring-brand-500" 
                          />
                          {c}
@@ -140,9 +175,9 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                      <input 
                         type="radio" 
-                        name="condition"
-                        checked={selectedCondition === 'All'}
-                        onChange={() => setSelectedCondition('All')}
+                        name={`condition_${isMobile ? 'mobile' : 'desktop'}`}
+                        checked={values.condition === 'All'}
+                        onChange={() => update('condition', 'All')}
                         className="text-brand-600 focus:ring-brand-500" 
                      />
                      Any Condition
@@ -150,7 +185,7 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
              </div>
         </div>
       </div>
-  );
+  )};
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -209,7 +244,7 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
         <div className="lg:hidden flex justify-between items-center mb-4">
             <button 
                 onClick={() => setShowMobileFilters(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium shadow-sm text-gray-700"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-full text-sm font-medium shadow-sm text-gray-700 active:bg-gray-50"
             >
                 <Filter className="w-4 h-4" />
                 Filters {hasActiveFilters && <span className="bg-brand-600 w-2 h-2 rounded-full"></span>}
@@ -218,8 +253,8 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
                  <span className="text-xs text-gray-500">Sort:</span>
                  <select
                     className="bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
-                    value={sortOption}
-                    onChange={(e) => setSortOption(e.target.value as SortOption)}
+                    value={activeFilters.sortOption}
+                    onChange={(e) => setActiveFilters(prev => ({ ...prev, sortOption: e.target.value as SortOption }))}
                 >
                     <option value="date_desc">Newest</option>
                     <option value="price_asc">Price: Low</option>
@@ -230,19 +265,29 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
 
         {/* Mobile Filter Sheet */}
         {showMobileFilters && (
-            <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-white">
-                <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+            <div className="fixed inset-0 z-[60] lg:hidden flex flex-col bg-white animate-in slide-in-from-bottom duration-300">
+                <div className="px-4 py-4 border-b border-gray-200 flex justify-between items-center bg-white">
                     <h2 className="text-lg font-bold">Filters</h2>
-                    <button onClick={() => setShowMobileFilters(false)} className="p-2">
+                    <button onClick={() => setShowMobileFilters(false)} className="p-2 rounded-full hover:bg-gray-100">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                    <FilterPanel />
+                <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                    <FilterPanel values={tempFilters} onChange={setTempFilters} isMobile={true} />
                 </div>
-                <div className="p-4 border-t border-gray-200 flex gap-4">
-                    <button onClick={clearFilters} className="flex-1 py-3 text-brand-600 font-medium border border-brand-600 rounded-lg">Clear All</button>
-                    <button onClick={() => setShowMobileFilters(false)} className="flex-1 py-3 bg-brand-600 text-white font-medium rounded-lg">Apply</button>
+                <div className="p-4 border-t border-gray-200 flex gap-4 bg-white shadow-lg">
+                    <button 
+                        onClick={clearFilters} 
+                        className="flex-1 py-3 text-brand-600 font-bold border-2 border-brand-600 rounded-lg hover:bg-brand-50"
+                    >
+                        Clear All
+                    </button>
+                    <button 
+                        onClick={applyMobileFilters} 
+                        className="flex-1 py-3 bg-brand-600 text-white font-bold rounded-lg hover:bg-brand-700 shadow-md"
+                    >
+                        Apply Filters
+                    </button>
                 </div>
             </div>
         )}
@@ -260,7 +305,8 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
                              <button onClick={clearFilters} className="text-xs text-red-600 hover:underline">Clear All</button>
                         )}
                      </div>
-                     <FilterPanel />
+                     {/* Desktop updates activeFilters directly */}
+                     <FilterPanel values={activeFilters} onChange={setActiveFilters} isMobile={false} />
                 </div>
             </div>
 
@@ -286,8 +332,8 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
                         <div className="relative">
                              <select
                                 className="appearance-none bg-white border border-gray-300 text-gray-900 py-1.5 px-3 pr-8 rounded-md text-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 cursor-pointer"
-                                value={sortOption}
-                                onChange={(e) => setSortOption(e.target.value as SortOption)}
+                                value={activeFilters.sortOption}
+                                onChange={(e) => setActiveFilters(prev => ({ ...prev, sortOption: e.target.value as SortOption }))}
                             >
                                 <option value="date_desc">Newest First</option>
                                 <option value="date_asc">Oldest First</option>
@@ -310,10 +356,10 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
                     <div className="mx-auto h-12 w-12 text-gray-300 mb-4">
                     <Tag className="w-full h-full" />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900">No items found</h3>
+                    <h3 className="text-lg font-medium text-gray-900">No active items found</h3>
                     <p className="mt-1 text-gray-500 text-sm">
                         {locationFilter 
-                            ? `No items found in "${locationFilter}". Try a different location.` 
+                            ? `No active items found in "${locationFilter}". Try a different location.` 
                             : "Try adjusting your search or filters."}
                     </p>
                     {hasActiveFilters && (

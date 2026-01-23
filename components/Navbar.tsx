@@ -253,7 +253,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, setUser, onSearch, selectedLocati
                         <img src={user.avatar} alt={user.name} className="h-10 w-10 rounded-full bg-gray-200 border border-gray-300" />
                         <ChevronDown className="w-5 h-5 text-gray-600" />
                         <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded shadow-xl border border-gray-100 py-2 hidden group-hover:block z-50">
-                            <Link to="/my-listings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Ads</Link>
+                            <Link to="/my-listings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Profile</Link>
                             <Link to="/favorites" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Favorites</Link>
                             <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-red-600">Logout</button>
                         </div>
@@ -277,8 +277,8 @@ const Navbar: React.FC<NavbarProps> = ({ user, setUser, onSearch, selectedLocati
           </div>
       </div>
 
-      {/* Categories Bar */}
-      <div className="bg-white border-b border-gray-200 shadow-sm relative z-40" ref={catRef}>
+      {/* Categories Bar - Hidden on Mobile as per request */}
+      <div className="bg-white border-b border-gray-200 shadow-sm relative z-40 hidden md:block" ref={catRef}>
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center h-12">
                   {/* All Categories Trigger */}
