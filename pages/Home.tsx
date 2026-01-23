@@ -240,6 +240,26 @@ const Home: React.FC<HomeProps> = ({ searchQuery, locationFilter, smartFilters }
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
+        {/* Mobile Category Dropdown - New Addition */}
+        <div className="lg:hidden mb-4 relative">
+             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Tag className="h-5 w-5 text-gray-400" />
+            </div>
+            <select
+                value={activeFilters.category}
+                onChange={(e) => setActiveFilters(prev => ({ ...prev, category: e.target.value as Category | 'All' }))}
+                className="appearance-none w-full pl-10 pr-10 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-shadow"
+            >
+                <option value="All">All Categories</option>
+                {Object.values(Category).map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <ChevronDown className="h-5 w-5 text-gray-400" />
+            </div>
+        </div>
+
         {/* Mobile Filter Toggle */}
         <div className="lg:hidden flex justify-between items-center mb-4">
             <button 
